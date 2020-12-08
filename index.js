@@ -42,13 +42,18 @@ app.get('/info', (request, response) => {
 app.get('/api/persons/:id', (request, response) => {
     const id = Number(request.params.id)
 
-    Person.findById(id).then(person => {
-        if(person) {
-            response.json(person)
-        } else {
-            response.status(404).end("No person found")
-        }
-    })
+    Person.findById(id)
+        .then(person => {
+            if(person) {
+                response.json(person)
+            } else {
+                response.status(404).json({ error: "No person found"})
+            }
+        })
+        .catch(err => {
+            console.log(err)
+            response.status(400).json({ error: `Mulformed Id ${id}`})
+        })
 })
 
 app.delete('/api/persons/:id', (request, response) => {
