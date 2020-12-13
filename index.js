@@ -93,6 +93,7 @@ app.post('/api/persons', (request, response, next) => {
             person.save().then(savedPerson => {
                 response.json(savedPerson)
             })
+            .catch(err => next(err))
         }
     })
     .catch(err => next(err))
@@ -122,8 +123,10 @@ const unknownEndpoint = (req, res) => {
 app.use(unknownEndpoint)
 
 const errorHandler = (error, req, res, next) => {
-    if(error.name == "CastError") {
+    if(error.name === 'CastError') {
         return res.status(400).send({error: "Mulformtted id"})
+    } else if(error.name === 'ValidationError') {
+        return res.status(400).json({ error: error.message})
     }
 
     next(error)
