@@ -19,7 +19,6 @@ app.use(morgan((tokens, req, res) => {
         JSON.stringify(req.body)
     ].join(' ')
 }))
-
 app.use(cors())
 
 app.get('/',(request,response) => {
@@ -34,38 +33,40 @@ app.get('/api/persons', (request, response) => {
 })
 
 app.get('/info', (request, response) => {
-    const entry = Person.find({}).count
-    const info = `Phonebook has info for ${entry} people\n\n${new Date()}`
-    response.end(info)
+    Person.countDocuments({}, (err, count) => {
+        if(err) {
+            return response.status(503).end({error: err})
+        } else {
+            const info = `Phonebook has info for ${count} people\n\n${new Date()}`
+            response.end(info)
+        }
+    })
 })
 
-app.get('/api/persons/:id', (request, response) => {
-    const id = Number(request.params.id)
-
-    Person.findById(id)
+app.get('/api/persons/:id', (request, response, next) => {
+    
+    Person.findById(request.params.id)
         .then(person => {
             if(person) {
                 response.json(person)
             } else {
-                response.status(404).json({ error: "No person found"})
+                return response.status(404).json({ error: "No person found"})
             }
         })
-        .catch(err => {
-            console.log(err)
-            response.status(400).json({ error: `Mulformed Id ${id}`})
-        })
+        .catch(err => next(err))
 })
 
-app.delete('/api/persons/:id', (request, response) => {
+app.delete('/api/persons/:id', (request, response, next) => {
     const id = request.params.id
 
     Person.findOneAndRemove({_id:id},person => {
         console.log("deleted : ", person)
         response.status(204).end()
     })
+    .catch(err => next(err))
 })
 
-app.post('/api/persons', (request, response) => {
+app.post('/api/persons', (request, response, next) => {
     const body = request.body
     if(!body.name) {
         return response.status(400).json({ error: "name is missing"})
@@ -78,7 +79,9 @@ app.post('/api/persons', (request, response) => {
     Person.find({name:body.name}).then( result => {
         console.log("Existing name found", result)
         if(result.length > 0) {
-            return response.status(400).json({ error: "name must be unique"})
+            const id = result[0].id
+            request.params.id = id
+            return handlePut(request, response, next)
         } else {
             const person = new Person(
                 {
@@ -92,7 +95,41 @@ app.post('/api/persons', (request, response) => {
             })
         }
     })
+    .catch(err => next(err))
 })
+
+app.put('/api/persons/:id', handlePut)
+
+function handlePut(req, res, next) {
+    const body = req.body
+
+    const note = {
+        name: body.name,
+        number: body.number
+    }
+
+    Person.findByIdAndUpdate(req.params.id, note, { new: true})
+        .then(updatedNote => {
+            res.json(updatedNote)
+        })
+        .catch(err => next(err))
+}
+
+const unknownEndpoint = (req, res) => {
+    res.status(404).send({ error: "unknown endpoint"})
+}
+
+app.use(unknownEndpoint)
+
+const errorHandler = (error, req, res, next) => {
+    if(error.name == "CastError") {
+        return res.status(400).send({error: "Mulformtted id"})
+    }
+
+    next(error)
+}
+
+app.use(errorHandler)
 
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => {
