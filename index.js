@@ -76,25 +76,15 @@ app.post('/api/persons', (request, response, next) => {
         return response.status(400).json({ error: "number is missing"})
     }
 
-    Person.find({name:body.name}).then( result => {
-        console.log("Existing name found", result)
-        if(result.length > 0) {
-            const id = result[0].id
-            request.params.id = id
-            return handlePut(request, response, next)
-        } else {
-            const person = new Person(
-                {
-                    name: body.name,
-                    number: body.number
-                }
-            )
-        
-            person.save().then(savedPerson => {
-                response.json(savedPerson)
-            })
-            .catch(err => next(err))
+    const person = new Person(
+        {
+            name: body.name,
+            number: body.number
         }
+    )
+
+    person.save().then(savedPerson => {
+        response.json(savedPerson)
     })
     .catch(err => next(err))
 })
@@ -109,7 +99,7 @@ function handlePut(req, res, next) {
         number: body.number
     }
 
-    Person.findByIdAndUpdate(req.params.id, note, { new: true})
+    Person.findByIdAndUpdate(req.params.id, note, { new: true, runValidators: true, context: 'query'})
         .then(updatedNote => {
             res.json(updatedNote)
         })
